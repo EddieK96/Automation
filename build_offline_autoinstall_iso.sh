@@ -83,6 +83,19 @@ echo "Preparing ArchISO profile..."
 rm -rf "${PROFILE_DIR}"
 cp -a /usr/share/archiso/configs/releng "${PROFILE_DIR}"
 
+PROFILE_PKGS_FILE="${PROFILE_DIR}/packages.x86_64"
+if [[ ! -f "${PROFILE_PKGS_FILE}" ]]; then
+  echo "ArchISO profile package list not found: ${PROFILE_PKGS_FILE}"
+  exit 1
+fi
+
+if [[ "${INSTALL_PROFILE}" == "hyperv" ]]; then
+  tmp_pkgs_file="${PROFILE_PKGS_FILE}.tmp"
+  grep -vE '^linux-firmware([[:space:]]|$)' "${PROFILE_PKGS_FILE}" > "${tmp_pkgs_file}"
+  mv "${tmp_pkgs_file}" "${PROFILE_PKGS_FILE}"
+  echo "INSTALL_PROFILE=hyperv -> removed linux-firmware from ArchISO live profile package list."
+fi
+
 mkdir -p "${PROFILE_DIR}/airootfs/root"
 mkdir -p "${PROFILE_DIR}/airootfs/etc/systemd/system/multi-user.target.wants"
 mkdir -p "${REPO_DIR}"
