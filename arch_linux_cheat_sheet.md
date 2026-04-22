@@ -342,6 +342,18 @@ ls -lh ./archlinux-latest-x86_64.iso
 .\setup_arch_vm_hyperv.ps1 -IsoPath ".\archlinux-latest-x86_64.iso" -StartVm
 ```
 
+If package download fails during ISO build with mirror errors (firmware/package retrieval):
+
+```bash
+cat > /etc/pacman.d/mirrorlist <<'EOF'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+Server = https://mirrors.kernel.org/archlinux/$repo/os/$arch
+EOF
+rm -f ./archiso-offline-autoinstall/airootfs/opt/offline-repo/*.part
+./build_offline_autoinstall_iso.sh
+```
+
 Optional: if you also want the official ISO for comparison/testing inside the live environment:
 
 ```bash

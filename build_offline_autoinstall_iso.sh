@@ -20,7 +20,7 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-for cmd in mkarchiso repo-add pacman rsync; do
+for cmd in mkarchiso repo-add pacman rsync git; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     echo "Missing command: ${cmd}"
     echo "Install required tools, e.g. pacman -S --needed archiso pacman-contrib rsync"
@@ -79,7 +79,48 @@ PKGS=(
 )
 
 echo "Downloading packages and dependencies for offline repo..."
-pacman -Syw --noconfirm --cachedir "${REPO_DIR}" "${PKGS[@]}"
+
+available_kb="$(df -Pk "${WORK_ROOT}" | awk 'NR==2 {print $4}')"
+if [[ -z "${available_kb}" || "${available_kb}" -lt 12582912 ]]; then
+  echo "Not enough free space under ${WORK_ROOT}. Need at least 12 GiB free to build and cache packages."
+  exit 1
+fi
+
+PACMAN_DL_CONF="${WORK_ROOT}/pacman-offline-build.conf"
+cat > "${PACMAN_DL_CONF}" <<'EOF'
+[options]
+Architecture = auto
+CheckSpace
+SigLevel = Required DatabaseOptional
+LocalFileSigLevel = Optional
+ParallelDownloads = 1
+
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+
+[multilib]
+Include = /etc/pacman.d/mirrorlist
+EOF
+
+cat > /etc/pacman.d/mirrorlist <<'EOF'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+Server = https://mirrors.kernel.org/archlinux/$repo/os/$arch
+EOF
+
+download_pkgs() {
+  pacman -Syy --noconfirm -C "${PACMAN_DL_CONF}" >/dev/null
+  pacman -Sw --noconfirm --cachedir "${REPO_DIR}" -C "${PACMAN_DL_CONF}" "${PKGS[@]}"
+}
+
+if ! download_pkgs; then
+  echo "First package download attempt failed. Cleaning partial files and retrying once..."
+  find "${REPO_DIR}" -type f \( -name '*.part' -o -name '*.db.part' -o -name '*.sig.part' \) -delete
+  download_pkgs
+fi
 
 shopt -s nullglob
 pkg_files=("${REPO_DIR}"/*.pkg.tar.zst)
