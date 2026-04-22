@@ -16,30 +16,90 @@ if ! command -v pacstrap >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
+  echo "Interactive TTY is not available (/dev/tty)."
+  echo "Run this script from the local VM console so prompts can accept input."
+  exit 1
+fi
+
+prompt_default() {
+  local prompt="$1"
+  local default_value="$2"
+  local value=""
+
+  printf "%s" "${prompt}" > /dev/tty
+  if ! IFS= read -r value < /dev/tty; then
+    echo "Input aborted."
+    exit 1
+  fi
+
+  if [[ -z "${value}" ]]; then
+    value="${default_value}"
+  fi
+
+  printf "%s" "${value}"
+}
+
+prompt_required() {
+  local prompt="$1"
+  local value=""
+
+  while true; do
+    printf "%s" "${prompt}" > /dev/tty
+    if ! IFS= read -r value < /dev/tty; then
+      echo "Input aborted."
+      exit 1
+    fi
+
+    if [[ -n "${value}" ]]; then
+      printf "%s" "${value}"
+      return
+    fi
+
+    printf "Please provide a value.\n" > /dev/tty
+  done
+}
+
+prompt_secret_required() {
+  local prompt="$1"
+  local value=""
+
+  while true; do
+    printf "%s" "${prompt}" > /dev/tty
+    if ! IFS= read -rs value < /dev/tty; then
+      echo "Input aborted."
+      exit 1
+    fi
+    printf "\n" > /dev/tty
+
+    if [[ -n "${value}" ]]; then
+      printf "%s" "${value}"
+      return
+    fi
+
+    printf "Value cannot be empty.\n" > /dev/tty
+  done
+}
+
 echo ""
 echo "Detected block devices:"
 lsblk -d -o NAME,SIZE,MODEL,TYPE
 echo ""
 
-read -rp "Install disk (default: /dev/nvme0n1): " DISK
-DISK="${DISK:-/dev/nvme0n1}"
+DISK="$(prompt_default "Install disk (default: /dev/nvme0n1): " "/dev/nvme0n1")"
 
 if [[ ! -b "${DISK}" ]]; then
   echo "Disk ${DISK} does not exist."
   exit 1
 fi
 
-read -rp "Hostname (default: arch): " HOSTNAME
-HOSTNAME="${HOSTNAME:-arch}"
+HOSTNAME="$(prompt_default "Hostname (default: arch): " "arch")"
 
-read -rp "Username (default: ed): " USERNAME
-USERNAME="${USERNAME:-ed}"
+USERNAME="$(prompt_default "Username (default: ed): " "ed")"
 
-read -rp "Timezone (default: Europe/Berlin): " TIMEZONE
-TIMEZONE="${TIMEZONE:-Europe/Berlin}"
+TIMEZONE="$(prompt_default "Timezone (default: Europe/Berlin): " "Europe/Berlin")"
 
-read -rp "Enable GNOME desktop? [Y/n]: " ENABLE_GNOME
-ENABLE_GNOME="${ENABLE_GNOME:-Y}"
+ENABLE_GNOME="$(prompt_default "Enable GNOME desktop? [Y/n]: " "Y")"
 
 OFFLINE_REPO_PRIMARY="/opt/offline-repo"
 OFFLINE_REPO_SECONDARY="/run/archiso/bootmnt/offline-repo"
@@ -50,8 +110,7 @@ elif [[ -d "${OFFLINE_REPO_SECONDARY}" ]]; then
   OFFLINE_REPO_PATH="${OFFLINE_REPO_SECONDARY}"
 fi
 
-read -rp "Install mode [auto/offline/online] (default: auto): " INSTALL_MODE
-INSTALL_MODE="${INSTALL_MODE:-auto}"
+INSTALL_MODE="$(prompt_default "Install mode [auto/offline/online] (default: auto): " "auto")"
 
 if [[ "${INSTALL_MODE}" == "offline" && -z "${OFFLINE_REPO_PATH}" ]]; then
   echo "Offline mode requested, but no offline repo found at ${OFFLINE_REPO_PRIMARY} or ${OFFLINE_REPO_SECONDARY}."
@@ -66,14 +125,12 @@ if [[ "${INSTALL_MODE}" == "auto" ]]; then
   fi
 fi
 
-read -rsp "Root password: " ROOT_PASSWORD
-echo ""
-read -rsp "User password for ${USERNAME}: " USER_PASSWORD
-echo ""
+ROOT_PASSWORD="$(prompt_secret_required "Root password: ")"
+USER_PASSWORD="$(prompt_secret_required "User password for ${USERNAME}: ")"
 
 echo ""
 echo "This will erase ALL data on ${DISK}."
-read -rp "Type YES to continue: " CONFIRM
+CONFIRM="$(prompt_required "Type YES to continue: ")"
 if [[ "${CONFIRM}" != "YES" ]]; then
   echo "Aborted."
   exit 1
@@ -240,8 +297,8 @@ fi
 
 echo ""
 echo "Install complete."
-read -rp "Unmount and reboot now? [Y/n]: " REBOOT_NOW
-if [[ "${REBOOT_NOW:-Y}" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
+REBOOT_NOW="$(prompt_default "Unmount and reboot now? [Y/n]: " "Y")"
+if [[ "${REBOOT_NOW}" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
   umount -R /mnt
   reboot
 else
