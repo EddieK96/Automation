@@ -324,8 +324,10 @@ cd /mnt/build
 git clone https://github.com/EddieK96/Automation.git Automation
 cd Automation
 chmod +x ./build_offline_autoinstall_iso.sh
-./build_offline_autoinstall_iso.sh
+INSTALL_PROFILE=hyperv ./build_offline_autoinstall_iso.sh
 ```
+
+For Hyper-V VM targets, `INSTALL_PROFILE=hyperv` skips `linux-firmware`, which reduces download size and avoids unnecessary firmware packages in the offline ISO.
 
 5. Verify output:
 

@@ -99,6 +99,13 @@ USERNAME="$(prompt_default "Username (default: ed): " "ed")"
 
 TIMEZONE="$(prompt_default "Timezone (default: Europe/Berlin): " "Europe/Berlin")"
 
+INSTALL_PROFILE="$(prompt_default "Install profile [generic/hyperv] (default: generic): " "generic")"
+INSTALL_PROFILE="${INSTALL_PROFILE,,}"
+if [[ "${INSTALL_PROFILE}" != "generic" && "${INSTALL_PROFILE}" != "hyperv" ]]; then
+  echo "Unsupported install profile: ${INSTALL_PROFILE}"
+  exit 1
+fi
+
 ENABLE_GNOME="$(prompt_default "Enable GNOME desktop? [Y/n]: " "Y")"
 
 OFFLINE_REPO_PRIMARY="/opt/offline-repo"
@@ -166,7 +173,12 @@ mount "${ROOT_PART}" /mnt
 mkdir -p /mnt/boot
 mount "${EFI_PART}" /mnt/boot
 
-BASE_PKGS=(base linux linux-firmware nano networkmanager sudo grub efibootmgr)
+BASE_PKGS=(base linux nano networkmanager sudo grub efibootmgr)
+if [[ "${INSTALL_PROFILE}" != "hyperv" ]]; then
+  BASE_PKGS+=(linux-firmware)
+else
+  echo "Install profile is hyperv: skipping linux-firmware package."
+fi
 if [[ "${ENABLE_GNOME}" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
   BASE_PKGS+=(gnome gdm)
 fi
@@ -215,6 +227,7 @@ HOSTNAME=$(printf '%q' "${HOSTNAME}")
 USERNAME=$(printf '%q' "${USERNAME}")
 TIMEZONE=$(printf '%q' "${TIMEZONE}")
 ENABLE_GNOME=$(printf '%q' "${ENABLE_GNOME}")
+INSTALL_PROFILE=$(printf '%q' "${INSTALL_PROFILE}")
 ROOT_PASSWORD_B64=$(printf '%q' "${ROOT_PASSWORD_B64}")
 USER_PASSWORD_B64=$(printf '%q' "${USER_PASSWORD_B64}")
 EOF

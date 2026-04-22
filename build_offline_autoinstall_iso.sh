@@ -15,6 +15,7 @@ WORK_DIR="${WORK_ROOT}/work"
 OUT_DIR="${WORK_ROOT}/out"
 REPO_DIR="${PROFILE_DIR}/airootfs/opt/offline-repo"
 MIN_FREE_GB="${MIN_FREE_GB:-30}"
+INSTALL_PROFILE="${INSTALL_PROFILE:-generic}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root (needed for mkarchiso and package cache writes)."
@@ -106,7 +107,6 @@ ln -sf /etc/systemd/system/arch-autoinstall.service \
 PKGS=(
   base
   linux
-  linux-firmware
   nano
   networkmanager
   sudo
@@ -115,6 +115,12 @@ PKGS=(
   gnome
   gdm
 )
+
+if [[ "${INSTALL_PROFILE}" != "hyperv" ]]; then
+  PKGS+=(linux-firmware)
+else
+  echo "INSTALL_PROFILE=hyperv -> omitting linux-firmware from offline package set."
+fi
 
 echo "Downloading packages and dependencies for offline repo..."
 
