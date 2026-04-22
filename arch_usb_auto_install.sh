@@ -206,6 +206,26 @@ if [[ "${ENABLE_GNOME}" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
   systemctl enable gdm
 fi
 
+# Run setup hooks if available
+echo "Checking for setup hooks..."
+
+HOOKS_MANIFEST="/root/setup-hooks-manifest.txt"
+HOOKS_DIR="/root/setup-hooks"
+
+if [[ -f "${HOOKS_MANIFEST}" && -d "${HOOKS_DIR}" ]]; then
+  echo "Found embedded setup hooks. Running..."
+  while IFS= read -r hook_name; do
+    [[ -z "$hook_name" ]] && continue
+    hook_path="${HOOKS_DIR}/${hook_name}"
+    if [[ -x "$hook_path" ]]; then
+      echo "  Executing hook: $hook_name"
+      bash "$hook_path" || {
+        echo "    Warning: hook $hook_name failed. Continuing..."
+      }
+    fi
+  done < "${HOOKS_MANIFEST}"
+fi
+
 rm -f /root/installer.env /root/post_install.sh
 EOF
 

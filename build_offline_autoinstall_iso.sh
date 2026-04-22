@@ -91,6 +91,62 @@ fi
 rm -f "${REPO_DIR}/offline.db*" "${REPO_DIR}/offline.files*"
 repo-add "${REPO_DIR}/offline.db.tar.gz" "${pkg_files[@]}"
 
+# Process setup hooks from repos (embed scripts in ISO for offline execution)
+HOOKS_DIR="${PROFILE_DIR}/airootfs/root/setup-hooks"
+HOOKS_MANIFEST="${PROFILE_DIR}/airootfs/root/setup-hooks-manifest.txt"
+SETUP_HOOKS_CONF="${WORK_ROOT}/setup-hooks.conf"
+
+if [[ -f "${SETUP_HOOKS_CONF}" ]]; then
+  mkdir -p "${HOOKS_DIR}"
+  > "${HOOKS_MANIFEST}"
+
+  echo "Processing setup hooks from ${SETUP_HOOKS_CONF}..."
+  while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+
+    # Parse: REPO_URL SCRIPT1 SCRIPT2 ...
+    read -r repo_url scripts_str <<< "$line"
+    
+    if [[ -z "$repo_url" ]]; then
+      continue
+    fi
+
+    echo "  Cloning $repo_url..."
+    temp_clone="/tmp/setup-hooks-$$-$(basename "$repo_url" .git)"
+    git clone --depth 1 "$repo_url" "$temp_clone" 2>/dev/null || {
+      echo "    Warning: failed to clone $repo_url. Skipping."
+      continue
+    }
+
+    # Copy each specified script
+    if [[ -z "$scripts_str" ]]; then
+      scripts_str="setup.sh post-install.sh"
+    fi
+
+    for script in $scripts_str; do
+      script_path="${temp_clone}/${script}"
+      if [[ -f "$script_path" ]]; then
+        script_name=$(basename "$script" .sh)_$(echo "$repo_url" | md5sum | cut -d' ' -f1 | cut -c1-8)
+        hook_dest="${HOOKS_DIR}/${script_name}.sh"
+        cp -f "$script_path" "$hook_dest"
+        chmod +x "$hook_dest"
+        echo "${script_name}.sh" >> "${HOOKS_MANIFEST}"
+        echo "    Embedded: $script"
+      fi
+    done
+
+    rm -rf "$temp_clone"
+  done < "${SETUP_HOOKS_CONF}"
+
+  if [[ -f "${HOOKS_MANIFEST}" && -s "${HOOKS_MANIFEST}" ]]; then
+    echo "Setup hooks manifest created with $(wc -l < "${HOOKS_MANIFEST}") hooks."
+  fi
+else
+  echo "No setup-hooks.conf found. Skipping hooks processing."
+fi
+
 echo "Building ISO..."
 rm -rf "${WORK_DIR}" "${OUT_DIR}"
 mkarchiso -v -w "${WORK_DIR}" -o "${OUT_DIR}" "${PROFILE_DIR}"

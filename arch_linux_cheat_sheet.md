@@ -252,6 +252,41 @@ Optional: skip auto-opening the VMConnect window:
 .\setup_arch_vm_hyperv.ps1 -StartVm -NoConsole
 ```
 
+## Setup Hooks (Post-Install Scripts)
+
+You can configure custom setup scripts to run automatically after the Arch installation completes. These scripts are stored in GitHub repos and can be embedded in the offline ISO or pulled at install time.
+
+### Configuration
+
+Edit `setup-hooks.conf` in the project root:
+
+```bash
+# Format: GITHUB_REPO_URL SCRIPT_RELATIVE_PATH [SCRIPT_RELATIVE_PATH ...]
+https://github.com/your-user/your-repo.git setup/init.sh setup/configure.sh
+https://github.com/other-user/dotfiles.git dotfiles/install.sh
+```
+
+### How It Works
+
+- **Offline mode** (ISO build): Scripts are embedded in the ISO and run locally without internet.
+- **Online mode** (direct install): Scripts are cloned fresh at install time if they're available.
+
+### Example Workflow
+
+1. Add your setup repos to `setup-hooks.conf`:
+
+```
+https://github.com/EddieK96/Automation.git post-install/setup.sh
+```
+
+2. Build the ISO (scripts are embedded):
+
+```bash
+sudo ./build_offline_autoinstall_iso.sh
+```
+
+3. Boot and install. After the base system is installed, your setup hooks run automatically.
+
 ## Build Custom Installer From Arch Live Medium (Inside VM)
 
 Use this flow when you boot a VM from the official Arch ISO and want to build the custom installer from GitHub.
