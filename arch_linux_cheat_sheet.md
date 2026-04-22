@@ -298,6 +298,8 @@ ping -c 1 archlinux.org
 ```
 
 2. Prepare persistent build storage (example uses `/dev/sda` and wipes it):
+   - `1MiB` below is the partition start offset for alignment, not the partition size.
+   - `100%` means the partition grows to the end of the disk.
 
 ```bash
 wipefs -a /dev/sda
