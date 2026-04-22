@@ -14,6 +14,7 @@ PROFILE_DIR="${WORK_ROOT}/${PROFILE_NAME}"
 WORK_DIR="${WORK_ROOT}/work"
 OUT_DIR="${WORK_ROOT}/out"
 REPO_DIR="${PROFILE_DIR}/airootfs/opt/offline-repo"
+MIN_FREE_GB="${MIN_FREE_GB:-30}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root (needed for mkarchiso and package cache writes)."
@@ -32,6 +33,43 @@ if [[ ! -f "${SCRIPT_SOURCE}" ]]; then
   echo "Installer script not found: ${SCRIPT_SOURCE}"
   exit 1
 fi
+
+if ! command -v findmnt >/dev/null 2>&1; then
+  echo "Missing command: findmnt"
+  echo "Install util-linux, then retry."
+  exit 1
+fi
+
+fs_info="$(findmnt -no TARGET,SOURCE,FSTYPE,AVAIL -T "${WORK_ROOT}" 2>/dev/null || true)"
+if [[ -z "${fs_info}" ]]; then
+  echo "Could not determine filesystem info for ${WORK_ROOT}."
+  exit 1
+fi
+
+echo "Build target filesystem: ${fs_info}"
+fs_type="$(awk '{print $3}' <<< "${fs_info}")"
+if [[ "${fs_type}" == "overlay" || "${fs_type}" == "tmpfs" || "${fs_type}" == "squashfs" ]]; then
+  echo "WORK_ROOT (${WORK_ROOT}) is on ${fs_type}, which is not suitable for large ISO builds."
+  echo "Mount persistent disk storage (e.g. /mnt/build) and run the script from there."
+  exit 1
+fi
+
+min_required_kb=$(( MIN_FREE_GB * 1024 * 1024 ))
+available_kb="$(df -Pk "${WORK_ROOT}" | awk 'NR==2 {print $4}')"
+if [[ -z "${available_kb}" || "${available_kb}" -lt "${min_required_kb}" ]]; then
+  echo "Not enough free space under ${WORK_ROOT}. Need at least ${MIN_FREE_GB} GiB free for package cache + ISO build."
+  df -h "${WORK_ROOT}"
+  exit 1
+fi
+
+# Quick write test so write-destination failures are detected before long downloads.
+mkdir -p "${WORK_ROOT}/.build-write-test"
+if ! dd if=/dev/zero of="${WORK_ROOT}/.build-write-test/probe.bin" bs=1M count=64 conv=fsync status=none; then
+  echo "Write test failed on ${WORK_ROOT}. Check guest disk health and host free space."
+  rm -rf "${WORK_ROOT}/.build-write-test"
+  exit 1
+fi
+rm -rf "${WORK_ROOT}/.build-write-test"
 
 echo "Preparing ArchISO profile..."
 rm -rf "${PROFILE_DIR}"
@@ -79,12 +117,6 @@ PKGS=(
 )
 
 echo "Downloading packages and dependencies for offline repo..."
-
-available_kb="$(df -Pk "${WORK_ROOT}" | awk 'NR==2 {print $4}')"
-if [[ -z "${available_kb}" || "${available_kb}" -lt 12582912 ]]; then
-  echo "Not enough free space under ${WORK_ROOT}. Need at least 12 GiB free to build and cache packages."
-  exit 1
-fi
 
 PACMAN_DL_CONF="${WORK_ROOT}/pacman-offline-build.conf"
 cat > "${PACMAN_DL_CONF}" <<'EOF'
