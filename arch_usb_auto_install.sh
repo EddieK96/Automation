@@ -194,6 +194,29 @@ if [[ "${ENABLE_GNOME}" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
   BASE_PKGS+=(gnome gdm)
 fi
 
+install_base_with_fallback() {
+  local pacstrap_args=("$@")
+  if pacstrap "${pacstrap_args[@]}" /mnt "${BASE_PKGS[@]}"; then
+    return 0
+  fi
+
+  if [[ " ${BASE_PKGS[*]} " == *" linux-firmware "* ]]; then
+    echo "Base install failed; retrying once without linux-firmware..."
+    local reduced_pkgs=()
+    local p
+    for p in "${BASE_PKGS[@]}"; do
+      if [[ "${p}" != "linux-firmware" ]]; then
+        reduced_pkgs+=("${p}")
+      fi
+    done
+    BASE_PKGS=("${reduced_pkgs[@]}")
+    pacstrap "${pacstrap_args[@]}" /mnt "${BASE_PKGS[@]}"
+    return 0
+  fi
+
+  return 1
+}
+
 if [[ "${INSTALL_MODE}" == "offline" ]]; then
   echo "Using offline install mode from ${OFFLINE_REPO_PATH}..."
   cat > /tmp/pacman-offline.conf <<EOF
@@ -210,7 +233,7 @@ Server = file://${OFFLINE_REPO_PATH}
 EOF
   pacman -Sy --noconfirm --config /tmp/pacman-offline.conf
   echo "Installing base system with pacstrap from offline repository..."
-  pacstrap -C /tmp/pacman-offline.conf /mnt "${BASE_PKGS[@]}"
+  install_base_with_fallback -C /tmp/pacman-offline.conf
 else
   echo "Checking internet connectivity..."
   if ! ping -c 1 archlinux.org >/dev/null 2>&1; then
@@ -224,7 +247,7 @@ else
   pacman -Syy --noconfirm
 
   echo "Installing base system with pacstrap..."
-  pacstrap /mnt "${BASE_PKGS[@]}"
+  install_base_with_fallback
 fi
 
 echo "Generating fstab..."

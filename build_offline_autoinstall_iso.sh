@@ -128,14 +128,19 @@ PKGS=(
   gdm
 )
 
+OPTIONAL_PKGS=()
+
 if [[ "${INSTALL_PROFILE}" != "hyperv" ]]; then
-  PKGS+=(linux-firmware)
+  OPTIONAL_PKGS+=(linux-firmware)
 else
   echo "INSTALL_PROFILE=hyperv -> omitting linux-firmware from offline package set."
 fi
 
 echo "Effective INSTALL_PROFILE: ${INSTALL_PROFILE}"
-echo "Offline package set: ${PKGS[*]}"
+echo "Offline required package set: ${PKGS[*]}"
+if (( ${#OPTIONAL_PKGS[@]} > 0 )); then
+  echo "Offline optional package set: ${OPTIONAL_PKGS[*]}"
+fi
 
 echo "Downloading packages and dependencies for offline repo..."
 
@@ -173,6 +178,14 @@ if ! download_pkgs; then
   echo "First package download attempt failed. Cleaning partial files and retrying once..."
   find "${REPO_DIR}" -type f \( -name '*.part' -o -name '*.db.part' -o -name '*.sig.part' \) -delete
   download_pkgs
+fi
+
+if (( ${#OPTIONAL_PKGS[@]} > 0 )); then
+  echo "Downloading optional packages (non-fatal): ${OPTIONAL_PKGS[*]}"
+  if ! pacman -Sw --noconfirm --cachedir "${REPO_DIR}" --config "${PACMAN_DL_CONF}" "${OPTIONAL_PKGS[@]}"; then
+    echo "Optional package download failed. Continuing without optional packages."
+    find "${REPO_DIR}" -type f \( -name '*.part' -o -name '*.db.part' -o -name '*.sig.part' \) -delete
+  fi
 fi
 
 shopt -s nullglob
