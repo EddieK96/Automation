@@ -112,8 +112,8 @@ Server = https://mirrors.kernel.org/archlinux/$repo/os/$arch
 EOF
 
 download_pkgs() {
-  pacman -Syy --noconfirm -C "${PACMAN_DL_CONF}" >/dev/null
-  pacman -Sw --noconfirm --cachedir "${REPO_DIR}" -C "${PACMAN_DL_CONF}" "${PKGS[@]}"
+  pacman -Syy --noconfirm --config "${PACMAN_DL_CONF}" >/dev/null
+  pacman -Sw --noconfirm --cachedir "${REPO_DIR}" --config "${PACMAN_DL_CONF}" "${PKGS[@]}"
 }
 
 if ! download_pkgs; then

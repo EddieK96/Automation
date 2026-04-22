@@ -128,7 +128,7 @@ LocalFileSigLevel = Optional
 SigLevel = Never
 Server = file://${OFFLINE_REPO_PATH}
 EOF
-  pacman -Sy --noconfirm -C /tmp/pacman-offline.conf
+  pacman -Sy --noconfirm --config /tmp/pacman-offline.conf
   echo "Installing base system with pacstrap from offline repository..."
   pacstrap -C /tmp/pacman-offline.conf /mnt "${BASE_PKGS[@]}"
 else
