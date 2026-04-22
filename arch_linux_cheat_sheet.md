@@ -284,7 +284,7 @@ pacman -Sy --noconfirm git archiso pacman-contrib rsync
 
 ```bash
 cd /mnt/build
-git clone https://github.com/<your-user>/<your-repo>.git Automation
+git clone https://github.com/EddieK96/Automation.git Automation
 cd Automation
 chmod +x ./build_offline_autoinstall_iso.sh
 ./build_offline_autoinstall_iso.sh
