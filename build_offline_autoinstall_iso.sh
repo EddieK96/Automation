@@ -16,6 +16,13 @@ OUT_DIR="${WORK_ROOT}/out"
 REPO_DIR="${PROFILE_DIR}/airootfs/opt/offline-repo"
 MIN_FREE_GB="${MIN_FREE_GB:-30}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-generic}"
+INSTALL_PROFILE="${INSTALL_PROFILE,,}"
+INSTALL_PROFILE="${INSTALL_PROFILE//[[:space:]]/}"
+
+if [[ "${INSTALL_PROFILE}" != "generic" && "${INSTALL_PROFILE}" != "hyperv" ]]; then
+  echo "Unsupported INSTALL_PROFILE='${INSTALL_PROFILE}'. Use 'generic' or 'hyperv'."
+  exit 1
+fi
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root (needed for mkarchiso and package cache writes)."
@@ -91,8 +98,13 @@ After=systemd-user-sessions.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/bash /root/arch_usb_auto_install.sh
-StandardInput=tty
+StandardInput=tty-force
+StandardOutput=journal+console
+StandardError=journal+console
 TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=no
 RemainAfterExit=yes
 
 [Install]
@@ -121,6 +133,9 @@ if [[ "${INSTALL_PROFILE}" != "hyperv" ]]; then
 else
   echo "INSTALL_PROFILE=hyperv -> omitting linux-firmware from offline package set."
 fi
+
+echo "Effective INSTALL_PROFILE: ${INSTALL_PROFILE}"
+echo "Offline package set: ${PKGS[*]}"
 
 echo "Downloading packages and dependencies for offline repo..."
 

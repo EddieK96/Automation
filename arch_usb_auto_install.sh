@@ -16,19 +16,27 @@ if ! command -v pacstrap >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
-  echo "Interactive TTY is not available (/dev/tty)."
+PROMPT_TTY=""
+if [[ -t 0 ]]; then
+  PROMPT_TTY="/dev/tty"
+elif [[ -r /dev/tty1 && -w /dev/tty1 ]]; then
+  PROMPT_TTY="/dev/tty1"
+elif [[ -r /dev/tty && -w /dev/tty ]]; then
+  PROMPT_TTY="/dev/tty"
+else
+  echo "Interactive TTY is not available (/dev/tty or /dev/tty1)."
   echo "Run this script from the local VM console so prompts can accept input."
   exit 1
 fi
+echo "Using prompt TTY: ${PROMPT_TTY}"
 
 prompt_default() {
   local prompt="$1"
   local default_value="$2"
   local value=""
 
-  printf "%s" "${prompt}" > /dev/tty
-  if ! IFS= read -r value < /dev/tty; then
+  printf "%s" "${prompt}" > "${PROMPT_TTY}"
+  if ! IFS= read -r value < "${PROMPT_TTY}"; then
     echo "Input aborted."
     exit 1
   fi
@@ -45,8 +53,8 @@ prompt_required() {
   local value=""
 
   while true; do
-    printf "%s" "${prompt}" > /dev/tty
-    if ! IFS= read -r value < /dev/tty; then
+    printf "%s" "${prompt}" > "${PROMPT_TTY}"
+    if ! IFS= read -r value < "${PROMPT_TTY}"; then
       echo "Input aborted."
       exit 1
     fi
@@ -56,7 +64,7 @@ prompt_required() {
       return
     fi
 
-    printf "Please provide a value.\n" > /dev/tty
+    printf "Please provide a value.\n" > "${PROMPT_TTY}"
   done
 }
 
@@ -65,19 +73,19 @@ prompt_secret_required() {
   local value=""
 
   while true; do
-    printf "%s" "${prompt}" > /dev/tty
-    if ! IFS= read -rs value < /dev/tty; then
+    printf "%s" "${prompt}" > "${PROMPT_TTY}"
+    if ! IFS= read -rs value < "${PROMPT_TTY}"; then
       echo "Input aborted."
       exit 1
     fi
-    printf "\n" > /dev/tty
+    printf "\n" > "${PROMPT_TTY}"
 
     if [[ -n "${value}" ]]; then
       printf "%s" "${value}"
       return
     fi
 
-    printf "Value cannot be empty.\n" > /dev/tty
+    printf "Value cannot be empty.\n" > "${PROMPT_TTY}"
   done
 }
 
@@ -101,6 +109,7 @@ TIMEZONE="$(prompt_default "Timezone (default: Europe/Berlin): " "Europe/Berlin"
 
 INSTALL_PROFILE="$(prompt_default "Install profile [generic/hyperv] (default: generic): " "generic")"
 INSTALL_PROFILE="${INSTALL_PROFILE,,}"
+INSTALL_PROFILE="${INSTALL_PROFILE//[[:space:]]/}"
 if [[ "${INSTALL_PROFILE}" != "generic" && "${INSTALL_PROFILE}" != "hyperv" ]]; then
   echo "Unsupported install profile: ${INSTALL_PROFILE}"
   exit 1
@@ -118,6 +127,8 @@ elif [[ -d "${OFFLINE_REPO_SECONDARY}" ]]; then
 fi
 
 INSTALL_MODE="$(prompt_default "Install mode [auto/offline/online] (default: auto): " "auto")"
+INSTALL_MODE="${INSTALL_MODE,,}"
+INSTALL_MODE="${INSTALL_MODE//[[:space:]]/}"
 
 if [[ "${INSTALL_MODE}" == "offline" && -z "${OFFLINE_REPO_PATH}" ]]; then
   echo "Offline mode requested, but no offline repo found at ${OFFLINE_REPO_PRIMARY} or ${OFFLINE_REPO_SECONDARY}."
